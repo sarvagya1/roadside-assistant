@@ -1,0 +1,150 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Roadside Assistance Microservices - AWS SAM Template
+
+Globals:
+  Function:
+    Runtime: java21
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        SPRING_PROFILES_ACTIVE: aws
+        JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+
+Resources:
+
+  # Customer Service Lambda Function
+  CustomerServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.springframework.cloud.function.adapter.aws.FunctionInvoker::handleRequest
+      CodeUri: customer-service/target/customer-service-1.0.0-aws.jar
+      Description: Customer Service - Manages customer registration and retrieval
+      Environment:
+        Variables:
+          SPRING_CLOUD_FUNCTION_DEFINITION: registerCustomer
+          DB_URL: !Sub '{{resolve:ssm:/roadside/customer-service/db-url}}'
+          DB_USERNAME: !Sub '{{resolve:ssm:/roadside/customer-service/db-username}}'
+          DB_PASSWORD: !Sub '{{resolve:secretsmanager:roadside/customer-service/db-password}}'
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/roadside/customer-service/*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:roadside/customer-service/*'
+      Events:
+        RegisterCustomer:
+          Type: Api
+          Properties:
+            Path: /api/v1/customers
+            Method: POST
+        GetCustomer:
+          Type: Api
+          Properties:
+            Path: /api/v1/customers/{id}
+            Method: GET
+        GetAllCustomers:
+          Type: Api
+          Properties:
+            Path: /api/v1/customers
+            Method: GET
+
+  # Ticket Service Lambda Function
+  TicketServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.springframework.cloud.function.adapter.aws.FunctionInvoker::handleRequest
+      CodeUri: ticket-service/target/ticket-service-1.0.0-aws.jar
+      Description: Ticket Service - Manages breakdown tickets and mechanic assignment
+      Environment:
+        Variables:
+          SPRING_CLOUD_FUNCTION_DEFINITION: createTicket
+          DB_URL: !Sub '{{resolve:ssm:/roadside/ticket-service/db-url}}'
+          DB_USERNAME: !Sub '{{resolve:ssm:/roadside/ticket-service/db-username}}'
+          DB_PASSWORD: !Sub '{{resolve:secretsmanager:roadside/ticket-service/db-password}}'
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/roadside/ticket-service/*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:roadside/ticket-service/*'
+      Events:
+        CreateTicket:
+          Type: Api
+          Properties:
+            Path: /api/v1/tickets
+            Method: POST
+        AssignMechanic:
+          Type: Api
+          Properties:
+            Path: /api/v1/tickets/{id}/assign
+            Method: PUT
+        GetTicket:
+          Type: Api
+          Properties:
+            Path: /api/v1/tickets/{id}
+            Method: GET
+
+  # Billing Service Lambda Function
+  BillingServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.springframework.cloud.function.adapter.aws.FunctionInvoker::handleRequest
+      CodeUri: billing-service/target/billing-service-1.0.0-aws.jar
+      Description: Billing Service - Manages bill generation and payment records
+      Environment:
+        Variables:
+          SPRING_CLOUD_FUNCTION_DEFINITION: generateBill
+          DB_URL: !Sub '{{resolve:ssm:/roadside/billing-service/db-url}}'
+          DB_USERNAME: !Sub '{{resolve:ssm:/roadside/billing-service/db-username}}'
+          DB_PASSWORD: !Sub '{{resolve:secretsmanager:roadside/billing-service/db-password}}'
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ssm:GetParameter
+                - ssm:GetParameters
+              Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/roadside/billing-service/*'
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:roadside/billing-service/*'
+      Events:
+        GenerateBill:
+          Type: Api
+          Properties:
+            Path: /api/v1/billing/generate
+            Method: POST
+        GetPayments:
+          Type: Api
+          Properties:
+            Path: /api/v1/billing/payments/{ticketId}
+            Method: GET
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
+  CustomerServiceFunction:
+    Description: Customer Service Lambda Function ARN
+    Value: !GetAtt CustomerServiceFunction.Arn
+  TicketServiceFunction:
+    Description: Ticket Service Lambda Function ARN
+    Value: !GetAtt TicketServiceFunction.Arn
+  BillingServiceFunction:
+    Description: Billing Service Lambda Function ARN
+    Value: !GetAtt BillingServiceFunction.Arn

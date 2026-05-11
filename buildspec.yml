@@ -1,0 +1,58 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21
+    commands:
+      - echo "Installing dependencies..."
+
+  pre_build:
+    commands:
+      - echo "Pre-build phase - validating project structure"
+      - java -version
+      - mvn --version
+
+  build:
+    commands:
+      - echo "Building all microservices..."
+      - mvn clean install -DskipTests
+      - echo "Running tests..."
+      - mvn test
+      - echo "Build completed successfully"
+
+  post_build:
+    commands:
+      - echo "Post-build phase - packaging artifacts"
+      - echo "Customer Service artifact: customer-service/target/customer-service-1.0.0.jar"
+      - echo "Ticket Service artifact: ticket-service/target/ticket-service-1.0.0.jar"
+      - echo "Billing Service artifact: billing-service/target/billing-service-1.0.0.jar"
+
+artifacts:
+  files:
+    - customer-service/target/customer-service-1.0.0.jar
+    - ticket-service/target/ticket-service-1.0.0.jar
+    - billing-service/target/billing-service-1.0.0.jar
+    - customer-service/target/customer-service-1.0.0-aws.jar
+    - ticket-service/target/ticket-service-1.0.0-aws.jar
+    - billing-service/target/billing-service-1.0.0-aws.jar
+    - template.yml
+  discard-paths: no
+
+cache:
+  paths:
+    - '/root/.m2/**/*'
+
+reports:
+  customer-service-tests:
+    files:
+      - 'customer-service/target/surefire-reports/*.xml'
+    file-format: JUNITXML
+  ticket-service-tests:
+    files:
+      - 'ticket-service/target/surefire-reports/*.xml'
+    file-format: JUNITXML
+  billing-service-tests:
+    files:
+      - 'billing-service/target/surefire-reports/*.xml'
+    file-format: JUNITXML
